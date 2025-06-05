@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>518</height>
+    <width>400</width>
+    <height>259</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -67,7 +67,7 @@ QTabBar {
       <property name="styleSheet">
        <string>QWidget#mainPage {
     background-color: rgba(255, 255, 255, 140); 
-    border-radius: 8px;
+    border-radius: 2px;
 }</string>
       </property>
       <layout class="QVBoxLayout" name="mainPageLayout">
@@ -362,7 +362,7 @@ QTabBar {
            <widget class="QLabel" name="history_title">
             <property name="font">
              <font>
-              <pointsize>14</pointsize>
+              <pointsize>7</pointsize>
               <weight>75</weight>
               <bold>true</bold>
              </font>
@@ -518,7 +518,7 @@ QTabBar {
            <widget class="QLabel" name="label">
             <property name="font">
              <font>
-              <pointsize>14</pointsize>
+              <pointsize>7</pointsize>
               <weight>75</weight>
               <bold>true</bold>
              </font>
@@ -694,7 +694,7 @@ QTabBar {
            <widget class="QLabel" name="haConfigLabel">
             <property name="font">
              <font>
-              <pointsize>14</pointsize>
+              <pointsize>7</pointsize>
               <weight>75</weight>
               <bold>true</bold>
              </font>
