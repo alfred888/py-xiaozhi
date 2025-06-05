@@ -97,16 +97,16 @@ QTabBar {
             <property name="font">
              <font>
               <family>Microsoft YaHei UI</family>
-              <pointsize>14</pointsize>
+              <pointsize>10</pointsize>
               <weight>75</weight>
               <bold>true</bold>
              </font>
             </property>
             <property name="styleSheet">
              <string notr="true">color: #2196F3;
-                     padding: 10px;
+                     padding: 5px;
                      background-color: #E3F2FD;
-                     border-radius: 8px;</string>
+                     border-radius: 4px;</string>
             </property>
             <property name="text">
              <string>状态: 未连接</string>
@@ -120,11 +120,11 @@ QTabBar {
            <widget class="QLabel" name="emotion_label">
             <property name="font">
              <font>
-              <pointsize>24</pointsize>
+              <pointsize>16</pointsize>
              </font>
             </property>
             <property name="styleSheet">
-             <string>margin: 15px;</string>
+             <string>margin: 5px;</string>
             </property>
             <property name="text">
              <string>😊</string>
@@ -138,7 +138,7 @@ QTabBar {
            <widget class="QLabel" name="tts_text_label">
             <property name="font">
              <font>
-              <pointsize>12</pointsize>
+              <pointsize>10</pointsize>
              </font>
             </property>
             <property name="styleSheet">
@@ -163,13 +163,13 @@ QTabBar {
          <property name="minimumSize">
           <size>
            <width>0</width>
-           <height>70</height>
+           <height>40</height>
           </size>
          </property>
          <property name="maximumSize">
           <size>
            <width>16777215</width>
-           <height>72</height>
+           <height>42</height>
           </size>
          </property>
          <property name="frameShape">
@@ -216,8 +216,8 @@ QTabBar {
               <widget class="QPushButton" name="mute">
                <property name="minimumSize">
                 <size>
-                 <width>72</width>
-                 <height>34</height>
+                 <width>50</width>
+                 <height>24</height>
                 </size>
                </property>
                <property name="text">
