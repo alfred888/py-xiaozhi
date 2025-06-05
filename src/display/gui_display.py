@@ -983,6 +983,14 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
             self.update_timer.timeout.connect(self._process_updates)
             self.update_timer.start(100)
 
+            # 设置窗口大小和位置
+            screen = QApplication.primaryScreen().geometry()
+            window_width = 500  # 修改为更小的宽度
+            window_height = 300  # 修改为更小的高度
+            x = (screen.width() - window_width) // 2
+            y = (screen.height() - window_height) // 2
+            self.root.setGeometry(x, y, window_width, window_height)
+
             # 在主线程中运行主循环
             self.logger.info("开始启动GUI主循环")
             self.root.show()
