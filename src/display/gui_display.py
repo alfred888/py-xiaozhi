@@ -985,8 +985,8 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
 
             # 设置窗口大小和位置
             screen = QApplication.primaryScreen().geometry()
-            window_width = 500  # 修改为更小的宽度
-            window_height = 300  # 修改为更小的高度
+            window_width = 400  # 修改为更小的宽度
+            window_height = 200  # 修改为更小的高度
             x = (screen.width() - window_width) // 2
             y = (screen.height() - window_height) // 2
             self.root.setGeometry(x, y, window_width, window_height)
