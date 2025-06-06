@@ -768,6 +768,8 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
                 raise FileNotFoundError(f"UI文件不存在: {ui_path}")
 
             uic.loadUi(str(ui_path), self.root)
+            # 设置窗口固定大小为500x500
+            self.root.setFixedSize(500, 500)
 
             # 获取UI中的控件
             self.status_label = self.root.findChild(QLabel, "status_label")
@@ -985,8 +987,8 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
 
             # 设置窗口大小和位置
             screen = QApplication.primaryScreen().geometry()
-            window_width = 400  # 修改为更小的宽度
-            window_height = 200  # 修改为更小的高度
+            window_width = 200  # 修改为更小的宽度
+            window_height = 100  # 修改为更小的高度
             x = (screen.width() - window_width) // 2
             y = (screen.height() - window_height) // 2
             self.root.setGeometry(x, y, window_width, window_height)
