@@ -43,11 +43,6 @@ class AudioCodec:
             self.input_stream = self._create_stream(is_input=True)
             self.output_stream = self._create_stream(is_input=False)
 
-            # 确保帧大小是Opus支持的（10ms的整数倍）
-            frame_size = int(AudioConfig.INPUT_SAMPLE_RATE * 0.01)  # 10ms的样本数
-            if frame_size % 2 != 0:  # 确保是偶数
-                frame_size += 1
-
             # 编解码器初始化（保持原始参数）
             self.opus_encoder = opuslib.Encoder(
                 AudioConfig.INPUT_SAMPLE_RATE,
@@ -58,7 +53,7 @@ class AudioCodec:
                 AudioConfig.OUTPUT_SAMPLE_RATE, AudioConfig.CHANNELS
             )
 
-            logger.info(f"音频设备和编解码器初始化成功，帧大小: {frame_size}")
+            logger.info("音频设备和编解码器初始化成功")
         except Exception as e:
             logger.error(f"初始化音频设备失败: {e}")
             self.close()
@@ -165,13 +160,7 @@ class AudioCodec:
                     self._reinitialize_stream(is_input=True)
                     return None
 
-                try:
-                    # 确保数据是16位PCM格式
-                    pcm_data = np.frombuffer(data, dtype=np.int16)
-                    return self.opus_encoder.encode(pcm_data.tobytes(), AudioConfig.INPUT_FRAME_SIZE)
-                except opuslib.OpusError as e:
-                    logger.error(f"Opus编码失败: {e}")
-                    return None
+                return self.opus_encoder.encode(data, AudioConfig.INPUT_FRAME_SIZE)
 
         except Exception as e:
             logger.error(f"音频读取失败: {e}")
