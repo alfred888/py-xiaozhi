@@ -437,7 +437,6 @@ class ConfigManager:
                 headers=headers,
                 json=payload,
                 timeout=10,  # 设置超时时间，防止请求卡死
-                proxies={"http": None, "https": None},  # 禁用代理
             )
 
             # 检查HTTP状态码

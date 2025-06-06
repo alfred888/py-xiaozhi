@@ -1,9 +1,10 @@
 import base64
 import os
 import threading
+import urllib.parse
 
 from openai import OpenAI
-
+import httpx
 
 class ImageAnalyzer:
     _instance = None
@@ -25,9 +26,22 @@ class ImageAnalyzer:
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
         models="qwen-omni-turbo",
     ):
+        # 确保 api_key 被正确编码
+        encoded_api_key = urllib.parse.quote(api_key)
+        http_client = httpx.Client(
+            base_url=base_url,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": f"Bearer {encoded_api_key}",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            timeout=30.0
+        )
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
+            http_client=http_client
         )
         self.models = models
 
