@@ -60,25 +60,49 @@ class AudioCodec:
             raise
 
     def _create_stream(self, is_input=True):
-        """流创建逻辑"""
-        params = {
-            "format": pyaudio.paInt16,
-            "channels": AudioConfig.CHANNELS,
-            "rate": (
-                AudioConfig.INPUT_SAMPLE_RATE
+        """创建音频流（优化设备选择）"""
+        try:
+            stream_config = {
+                "format": pyaudio.paInt16,
+                "channels": AudioConfig.CHANNELS,
+                "rate": AudioConfig.INPUT_SAMPLE_RATE
                 if is_input
-                else AudioConfig.OUTPUT_SAMPLE_RATE
-            ),
-            "input" if is_input else "output": True,
-            "frames_per_buffer": (
-                AudioConfig.INPUT_FRAME_SIZE
+                else AudioConfig.OUTPUT_SAMPLE_RATE,
+                "frames_per_buffer": AudioConfig.INPUT_FRAME_SIZE
                 if is_input
-                else AudioConfig.OUTPUT_FRAME_SIZE
-            ),
-            "start": False,
-        }
+                else AudioConfig.OUTPUT_FRAME_SIZE,
+                "input": is_input,
+                "output": not is_input,
+                "input_device_index": None,
+                "output_device_index": None,
+            }
 
-        return self.audio.open(**params)
+            # 设置设备索引
+            if is_input:
+                stream_config["input_device_index"] = self._get_device_index(
+                    AudioConfig.INPUT_DEVICE
+                )
+            else:
+                stream_config["output_device_index"] = self._get_device_index(
+                    AudioConfig.OUTPUT_DEVICE
+                )
+
+            return self.audio.open(**stream_config)
+        except Exception as e:
+            logger.error(f"创建{'输入' if is_input else '输出'}流失败: {e}")
+            return None
+
+    def _get_device_index(self, device_name):
+        """获取音频设备索引"""
+        try:
+            # 解析设备名称（例如：hw:2,0）
+            if device_name.startswith("hw:"):
+                card, device = device_name[3:].split(",")
+                return int(card)
+            return None
+        except Exception as e:
+            logger.error(f"获取设备索引失败: {e}")
+            return None
 
     def _reinitialize_stream(self, is_input=True):
         """通用流重建方法"""
