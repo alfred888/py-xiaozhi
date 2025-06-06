@@ -61,48 +61,24 @@ class AudioCodec:
 
     def _create_stream(self, is_input=True):
         """流创建逻辑"""
-        try:
-            # 查找XFM-DP设备
-            device_index = None
-            for i in range(self.audio.get_device_count()):
-                device_info = self.audio.get_device_info_by_index(i)
-                if is_input and device_info["maxInputChannels"] > 0:
-                    if "XFM-DP" in device_info["name"]:
-                        device_index = i
-                        logger.info(f"选择输入设备: {device_info['name']} (索引: {i})")
-                        break
-            
-            # 如果找不到XFM-DP设备，使用默认设备
-            if is_input and device_index is None:
-                logger.warning("未找到XFM-DP设备，使用默认输入设备")
-                device_index = self.audio.get_default_input_device_info()["index"]
-                logger.info(f"使用默认输入设备: {self.audio.get_device_info_by_index(device_index)['name']}")
+        params = {
+            "format": pyaudio.paInt16,
+            "channels": AudioConfig.CHANNELS,
+            "rate": (
+                AudioConfig.INPUT_SAMPLE_RATE
+                if is_input
+                else AudioConfig.OUTPUT_SAMPLE_RATE
+            ),
+            "input" if is_input else "output": True,
+            "frames_per_buffer": (
+                AudioConfig.INPUT_FRAME_SIZE
+                if is_input
+                else AudioConfig.OUTPUT_FRAME_SIZE
+            ),
+            "start": False,
+        }
 
-            params = {
-                "format": pyaudio.paInt16,
-                "channels": AudioConfig.CHANNELS,
-                "rate": (
-                    AudioConfig.INPUT_SAMPLE_RATE
-                    if is_input
-                    else AudioConfig.OUTPUT_SAMPLE_RATE
-                ),
-                "input" if is_input else "output": True,
-                "frames_per_buffer": (
-                    AudioConfig.INPUT_FRAME_SIZE
-                    if is_input
-                    else AudioConfig.OUTPUT_FRAME_SIZE
-                ),
-                "start": False,
-            }
-
-            # 添加设备索引
-            if is_input and device_index is not None:
-                params["input_device_index"] = device_index
-
-            return self.audio.open(**params)
-        except Exception as e:
-            logger.error(f"创建音频流失败: {e}")
-            raise
+        return self.audio.open(**params)
 
     def _reinitialize_stream(self, is_input=True):
         """通用流重建方法"""
@@ -152,23 +128,17 @@ class AudioCodec:
     def read_audio(self):
         """（优化缓冲区管理）"""
         if self.is_input_paused():
-            logger.debug("音频输入已暂停，跳过读取")
             return None
 
         try:
             with self._stream_lock:
                 # 流状态检查优化
                 if not self.input_stream or not self.input_stream.is_active():
-                    logger.warning("输入流未激活，尝试重新初始化")
                     if not self._reinitialize_stream(is_input=True):
-                        logger.error("重新初始化输入流失败")
                         return None
-                    logger.info("输入流重新初始化成功")
 
                 # 动态缓冲区调整 - 实时性能优化
                 available = self.input_stream.get_read_available()
-                logger.debug(f"当前可用音频数据: {available} 样本")
-                
                 if available > AudioConfig.INPUT_FRAME_SIZE * 2:  # 降低阈值从3倍到2倍
                     skip_samples = available - (
                         AudioConfig.INPUT_FRAME_SIZE * 1.5
@@ -183,31 +153,14 @@ class AudioCodec:
                 data = self.input_stream.read(
                     AudioConfig.INPUT_FRAME_SIZE, exception_on_overflow=False
                 )
-                
-                # 记录音频数据的基本信息
-                if data:
-                    audio_data = np.frombuffer(data, dtype=np.int16)
-                    max_amplitude = np.max(np.abs(audio_data))
-                    logger.debug(f"读取到音频数据: 长度={len(data)}, 最大振幅={max_amplitude}")
-                    
-                    # 如果振幅太小，可能是静音
-                    if max_amplitude < 100:  # 可以调整这个阈值
-                        logger.debug("检测到静音或音量过低")
 
                 # 数据验证
                 if len(data) != AudioConfig.INPUT_FRAME_SIZE * 2:
-                    logger.warning(f"音频数据长度异常: {len(data)} != {AudioConfig.INPUT_FRAME_SIZE * 2}，重置输入流")
+                    logger.warning("音频数据长度异常，重置输入流")
                     self._reinitialize_stream(is_input=True)
                     return None
 
-                # 编码前记录原始数据
-                try:
-                    encoded_data = self.opus_encoder.encode(data, AudioConfig.INPUT_FRAME_SIZE)
-                    logger.debug(f"音频编码成功: 原始大小={len(data)}, 编码后大小={len(encoded_data)}")
-                    return encoded_data
-                except Exception as e:
-                    logger.error(f"音频编码失败: {e}")
-                    return None
+                return self.opus_encoder.encode(data, AudioConfig.INPUT_FRAME_SIZE)
 
         except Exception as e:
             logger.error(f"音频读取失败: {e}")
