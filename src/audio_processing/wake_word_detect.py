@@ -249,17 +249,46 @@ class WakeWordDetector:
                     logger.warning("音频流为空")
                     return None
                 try:
+                    # 检查流是否已打开
+                    if not hasattr(stream, "_stream") or not stream._stream:
+                        logger.warning("音频流未打开，尝试重新初始化")
+                        self._reset_stream()
+                        stream = self.audio_codec.input_stream
+                        if not stream:
+                            return None
+
                     if stream.is_active():
                         return stream
+
                     # 尝试重新激活
                     if hasattr(stream, "start_stream"):
                         logger.info("尝试重新启动音频流")
-                        stream.start_stream()
-                        if stream.is_active():
-                            logger.info("音频流重新启动成功")
-                            return stream
-                        else:
-                            logger.warning("音频流重新启动失败")
+                        try:
+                            # 确保流已关闭
+                            try:
+                                stream.stop_stream()
+                            except Exception:
+                                pass
+                            time.sleep(0.1)  # 等待流完全停止
+
+                            # 重新打开流
+                            try:
+                                stream.start_stream()
+                                time.sleep(0.1)  # 等待流完全启动
+                                if stream.is_active():
+                                    logger.info("音频流重新启动成功")
+                                    return stream
+                                else:
+                                    logger.warning("音频流重新启动失败")
+                            except Exception as e:
+                                logger.error(f"启动音频流时出错: {e}")
+                                # 尝试完全重新初始化
+                                self._reset_stream()
+                                stream = self.audio_codec.input_stream
+                                if stream and stream.is_active():
+                                    return stream
+                        except Exception as e:
+                            logger.error(f"重启音频流时出错: {e}")
                     return None
                 except Exception as e:
                     logger.error(f"检查音频流状态时出错: {e}")
@@ -275,13 +304,30 @@ class WakeWordDetector:
                 return None
 
             try:
+                # 检查可用数据
+                available = stream.get_read_available()
+                if available < self.buffer_size:
+                    time.sleep(0.01)  # 等待更多数据
+                    return None
+
                 data = stream.read(self.buffer_size, exception_on_overflow=False)
                 if not data:
                     logger.warning("读取到空音频数据")
                     return None
+
+                # 验证数据格式
+                if not isinstance(data, bytes) or len(data) != self.buffer_size * 2:
+                    logger.warning(f"读取到非法音频数据: 类型={type(data)}, 长度={len(data) if hasattr(data, '__len__') else 'N/A'}")
+                    return None
+
+                logger.debug(f"成功读取音频数据，前10字节: {data[:10]}")
                 return data
             except Exception as e:
-                logger.error(f"读取音频数据失败: {e}")
+                if "Unanticipated host error" in str(e):
+                    logger.error("检测到ALSA错误，尝试重新初始化音频流")
+                    self._reset_stream()
+                else:
+                    logger.error(f"读取音频数据失败: {e}")
                 return None
         except Exception as e:
             logger.error(f"音频流操作失败: {e}")
@@ -484,13 +530,26 @@ class WakeWordDetector:
 
     def stop(self):
         """停止检测"""
-        if self.running:
-            self.running = False
-            if self.detection_thread and self.detection_thread.is_alive():
-                self.detection_thread.join(timeout=1.0)
-            self.stream = None
-            self.external_stream = False
-            logger.info("唤醒词检测已停止")
+        self.running = False
+        if self.detection_thread:
+            self.detection_thread.join(timeout=2.0)
+            self.detection_thread = None
+
+        # 确保正确关闭音频流
+        if self.audio_codec and hasattr(self.audio_codec, "input_stream"):
+            try:
+                stream = self.audio_codec.input_stream
+                if stream:
+                    if hasattr(stream, "stop_stream"):
+                        stream.stop_stream()
+                    if hasattr(stream, "close"):
+                        stream.close()
+            except Exception as e:
+                logger.error(f"关闭音频流时出错: {e}")
+
+        self.stream = None
+        self.external_stream = False
+        logger.info("唤醒词检测已停止")
 
     def is_running(self):
         """检查是否正在运行"""
@@ -631,7 +690,34 @@ class WakeWordDetector:
         try:
             if self.audio_codec:
                 logger.info("尝试重新初始化音频流")
+                # 先停止并关闭现有流
+                if hasattr(self.audio_codec, "input_stream") and self.audio_codec.input_stream:
+                    try:
+                        stream = self.audio_codec.input_stream
+                        if hasattr(stream, "stop_stream"):
+                            stream.stop_stream()
+                        if hasattr(stream, "close"):
+                            stream.close()
+                        time.sleep(0.2)  # 等待流完全关闭
+                    except Exception as e:
+                        logger.warning(f"关闭现有音频流时出错: {e}")
+
+                # 重新初始化
                 self.audio_codec._reinitialize_stream(is_input=True)
-                logger.info("音频流重新初始化成功")
+                time.sleep(0.3)  # 等待初始化完成
+
+                # 验证新流
+                if hasattr(self.audio_codec, "input_stream") and self.audio_codec.input_stream:
+                    stream = self.audio_codec.input_stream
+                    if hasattr(stream, "_stream") and stream._stream and stream.is_active():
+                        logger.info("音频流重新初始化成功")
+                        return True
+                    else:
+                        logger.warning("音频流重新初始化后未激活")
+                        return False
+                else:
+                    logger.error("音频流重新初始化失败")
+                    return False
         except Exception as e:
             logger.error(f"重置音频流失败: {e}")
+            return False
