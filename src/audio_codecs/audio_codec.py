@@ -65,21 +65,23 @@ class AudioCodec:
             # 查找XFM-DP-V0.0.18设备
             device_index = None
             device_info = None
+            logger.info("开始扫描音频设备...")
             for i in range(self.audio.get_device_count()):
                 info = self.audio.get_device_info_by_index(i)
+                logger.debug(f"设备 {i}: {info['name']} (输入通道: {info['maxInputChannels']}, 输出通道: {info['maxOutputChannels']})")
                 if is_input and info["maxInputChannels"] > 0:
                     if "XFM-DP-V0.0.18" in info["name"]:
                         device_index = i
                         device_info = info
-                        logger.info(f"选择输入设备: {info['name']} (索引: {i})")
+                        logger.info(f"找到讯飞麦克风设备: {info['name']} (索引: {i})")
                         break
             
             # 如果找不到XFM-DP-V0.0.18设备，使用默认设备
             if is_input and device_index is None:
-                logger.warning("未找到XFM-DP-V0.0.18设备，使用默认输入设备")
+                logger.warning("未找到讯飞麦克风设备，使用默认输入设备")
                 device_index = self.audio.get_default_input_device_info()["index"]
                 device_info = self.audio.get_device_info_by_index(device_index)
-                logger.info(f"使用默认输入设备: {device_info['name']}")
+                logger.info(f"使用默认输入设备: {device_info['name']} (索引: {device_index})")
 
             # 获取设备支持的采样率
             if device_info:
@@ -108,8 +110,11 @@ class AudioCodec:
             # 添加设备索引
             if is_input and device_index is not None:
                 params["input_device_index"] = device_index
+                logger.info(f"使用设备索引: {device_index}")
 
-            return self.audio.open(**params)
+            stream = self.audio.open(**params)
+            logger.info(f"音频流创建成功: {'输入' if is_input else '输出'} (采样率: {sample_rate}Hz)")
+            return stream
         except Exception as e:
             logger.error(f"创建音频流失败: {e}")
             raise
