@@ -1,8 +1,18 @@
 #!/bin/bash
 
+# 获取脚本所在目录的绝对路径
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+RULES_FILE="$SCRIPT_DIR/99-xunfei-mic.rules"
+
 # 检查是否以root权限运行
 if [ "$EUID" -ne 0 ]; then 
     echo "请使用sudo运行此脚本"
+    exit 1
+fi
+
+# 检查规则文件是否存在
+if [ ! -f "$RULES_FILE" ]; then
+    echo "错误：找不到规则文件 $RULES_FILE"
     exit 1
 fi
 
@@ -11,7 +21,7 @@ echo "当前连接的设备："
 ls -l /dev/tty* | grep -E "USB|ACM"
 
 # 复制规则文件到udev目录
-cp 99-xunfei-mic.rules /etc/udev/rules.d/
+cp "$RULES_FILE" /etc/udev/rules.d/
 
 # 重新加载udev规则
 udevadm control --reload-rules
