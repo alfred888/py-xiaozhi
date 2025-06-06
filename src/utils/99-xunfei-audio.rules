@@ -1,0 +1,2 @@
+# 讯飞音频设备规则
+SUBSYSTEM=="sound", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{id}=="XFMDPV0018", SYMLINK+="xunfei_audio" 
