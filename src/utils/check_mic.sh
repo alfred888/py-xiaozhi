@@ -7,6 +7,12 @@ mkdir -p "$RECORD_DIR"
 # 获取当前时间戳
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
+# 检查是否安装了 soxi
+if ! command -v soxi &> /dev/null; then
+    echo "警告: soxi 未安装，将跳过音频文件信息显示"
+    echo "可以通过 'sudo apt-get install sox' 安装"
+fi
+
 # 获取所有录音设备
 echo "正在检测可用的麦克风设备..."
 arecord -l | grep "card" | while read -r line; do
@@ -20,19 +26,43 @@ arecord -l | grep "card" | while read -r line; do
     echo "正在测试麦克风: Card $CARD_NUM - $DEVICE_NAME"
     echo "录音将保存到: $FILENAME"
     
-    # 录音5秒
-    arecord -D "hw:$CARD_NUM,0" -f S16_LE -r 16000 -c 1 -d 5 "$FILENAME"
+    # 尝试不同的采样率和通道配置
+    SAMPLE_RATES=(48000 16000)
+    CHANNELS=(2 1)
     
-    if [ $? -eq 0 ]; then
-        echo "✓ 录音成功完成"
-        # 显示音频文件信息
-        echo "音频文件信息:"
-        soxi "$FILENAME"
-    else
-        echo "✗ 录音失败"
+    SUCCESS=false
+    
+    for rate in "${SAMPLE_RATES[@]}"; do
+        for ch in "${CHANNELS[@]}"; do
+            echo "尝试采样率: ${rate}Hz, 通道数: ${ch}"
+            
+            # 录音5秒
+            if arecord -D "hw:$CARD_NUM,0" -f S16_LE -r $rate -c $ch -d 5 "$FILENAME" 2>/dev/null; then
+                SUCCESS=true
+                echo "✓ 录音成功完成 (采样率: ${rate}Hz, 通道数: ${ch})"
+                
+                # 显示音频文件信息（如果安装了soxi）
+                if command -v soxi &> /dev/null; then
+                    echo "音频文件信息:"
+                    soxi "$FILENAME"
+                fi
+                
+                break 2  # 跳出两层循环
+            fi
+        done
+    done
+    
+    if [ "$SUCCESS" = false ]; then
+        echo "✗ 所有配置组合都失败"
+        rm -f "$FILENAME"  # 删除失败的录音文件
     fi
+    
     echo "----------------------------------------"
 done
 
 echo "所有麦克风测试完成！"
-echo "录音文件保存在: $RECORD_DIR 目录下" 
+echo "录音文件保存在: $RECORD_DIR 目录下"
+
+# 显示录音文件列表
+echo -e "\n录音文件列表:"
+ls -lh "$RECORD_DIR" 
