@@ -142,19 +142,24 @@ class WakeWordDetector:
 
         # 设置音频源
         if audio_codec_or_stream:
+            logger.info(f"收到音频源: {type(audio_codec_or_stream).__name__}")
+            
             if hasattr(audio_codec_or_stream, "read") and hasattr(
                 audio_codec_or_stream, "is_active"
             ):
                 # 外部流
+                logger.info("使用外部音频流")
                 self.stream = audio_codec_or_stream
                 self.external_stream = True
                 return self._start_detection_thread("ExternalStream")
             else:
                 # AudioCodec对象
+                logger.info("使用AudioCodec对象")
                 self.audio_codec = audio_codec_or_stream
                 return self._start_with_audio_codec()
 
         if self.audio_codec:
+            logger.info("使用已存在的AudioCodec对象")
             return self._start_with_audio_codec()
 
         logger.error("需要AudioCodec实例或外部音频流")
@@ -212,7 +217,9 @@ class WakeWordDetector:
                 current_time = time.time()
                 if current_time - last_stream_check >= STREAM_CHECK_INTERVAL:
                     last_stream_check = current_time
-                    if not self._check_stream_status():
+                    if not self._check_microphone_status():
+                        logger.warning("麦克风状态异常，尝试重新初始化")
+                        self._reset_stream()
                         time.sleep(RETRY_DELAY)
                         continue
 
@@ -720,4 +727,66 @@ class WakeWordDetector:
                     return False
         except Exception as e:
             logger.error(f"重置音频流失败: {e}")
+            return False
+
+    def _check_microphone_status(self):
+        """检查麦克风状态"""
+        try:
+            if not self.audio_codec:
+                logger.warning("AudioCodec未初始化")
+                return False
+
+            # 检查输入设备
+            pa = self.audio_codec.p
+            input_devices = []
+            for i in range(pa.get_device_count()):
+                device_info = pa.get_device_info_by_index(i)
+                if device_info["maxInputChannels"] > 0:
+                    input_devices.append({
+                        "index": i,
+                        "name": device_info["name"],
+                        "channels": device_info["maxInputChannels"]
+                    })
+
+            if not input_devices:
+                logger.error("未找到可用的麦克风设备")
+                return False
+
+            logger.info(f"找到 {len(input_devices)} 个麦克风设备:")
+            for device in input_devices:
+                logger.info(f"- 设备 {device['index']}: {device['name']} (通道数: {device['channels']})")
+
+            # 检查当前使用的输入流
+            if not hasattr(self.audio_codec, "input_stream"):
+                logger.warning("AudioCodec没有输入流")
+                return False
+
+            stream = self.audio_codec.input_stream
+            if not stream:
+                logger.warning("音频流为空")
+                return False
+
+            try:
+                if not stream.is_active():
+                    logger.warning("音频流未激活")
+                    return False
+
+                # 尝试读取一小段数据来验证麦克风是否工作
+                try:
+                    test_data = stream.read(1024, exception_on_overflow=False)
+                    if not test_data:
+                        logger.warning("无法从麦克风读取数据")
+                        return False
+                    logger.debug("麦克风工作正常")
+                    return True
+                except Exception as e:
+                    logger.error(f"读取麦克风数据时出错: {e}")
+                    return False
+
+            except Exception as e:
+                logger.error(f"检查音频流状态时出错: {e}")
+                return False
+
+        except Exception as e:
+            logger.error(f"检查麦克风状态时出错: {e}")
             return False
