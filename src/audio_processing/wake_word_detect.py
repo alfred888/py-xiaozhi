@@ -165,6 +165,11 @@ class WakeWordDetector:
         if not self.audio_codec or not hasattr(self.audio_codec, "input_stream"):
             logger.error("AudioCodec无效或输入流不可用")
             return False
+        try:
+            self.audio_codec._reinitialize_stream(is_input=True)
+        except Exception as e:
+            logger.error(f"音频流初始化失败: {e}")
+            return False
 
         self.stream = self.audio_codec.input_stream
         self.external_stream = True
@@ -245,25 +250,26 @@ class WakeWordDetector:
 
         return self.stream if self.stream and self.stream.is_active() else None
 
-    def _read_audio_data(self, stream):
+    def _read_audio_data(self):
         """读取音频数据"""
         try:
-            stream = self.audio_codec.input_stream
+            stream = self._get_active_stream()
             if not stream or not stream.is_active():
                 logger.warning("音频流未打开或不活跃，跳过本轮检测")
                 return None
 
             available = stream.get_read_available()
-            if available < self.audio_codec.INPUT_FRAME_SIZE:
+            if available < self.buffer_size:
                 time.sleep(0.01)  # 稍等
                 return None
 
-            data = stream.read(self.audio_codec.INPUT_FRAME_SIZE, exception_on_overflow=False)
+            data = stream.read(self.buffer_size, exception_on_overflow=False)
 
-            if not isinstance(data, bytes) or len(data) != self.audio_codec.INPUT_FRAME_SIZE * 2:
+            if not isinstance(data, bytes) or len(data) != self.buffer_size * 2:
                 logger.warning(f"读取到非法音频数据: 类型={type(data)}, 长度={len(data) if hasattr(data, '__len__') else 'N/A'}")
                 return None
 
+            logger.debug(f"成功读取音频数据，前10字节: {data[:10]}")
             return data
         except Exception as e:
             logger.exception(f"读取音频数据失败: {e}")
