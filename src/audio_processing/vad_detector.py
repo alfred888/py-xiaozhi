@@ -34,7 +34,7 @@ class VADDetector:
         self.vad.set_mode(3)  # 设置最高灵敏度
 
         # 参数设置
-        self.sample_rate = 16000
+        self.sample_rate = 48000  # 采样率48kHz
         self.frame_duration = 20  # 毫秒
         self.frame_size = int(self.sample_rate * self.frame_duration / 1000)
         self.speech_window = 5  # 连续检测到多少帧语音才触发打断
@@ -120,8 +120,8 @@ class VADDetector:
             # 创建输入流
             self.stream = self.pa.open(
                 format=pyaudio.paInt16,
-                channels=1,
-                rate=self.sample_rate,
+                channels=1,  # 单声道
+                rate=self.sample_rate,  # 48kHz采样率
                 input=True,
                 input_device_index=device_index,
                 frames_per_buffer=self.frame_size,

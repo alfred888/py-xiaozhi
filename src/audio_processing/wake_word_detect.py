@@ -189,100 +189,84 @@ class WakeWordDetector:
 
     def _detection_loop(self):
         """统一的检测循环"""
+        logger.info("开始唤醒词检测循环")
         error_count = 0
         MAX_ERRORS = 5
-        RETRY_DELAY = 0.5  # 重试延迟（秒）
+        last_reset_time = 0
 
-        while self.running:
+        while self._running:
             try:
-                if self.paused:
-                    time.sleep(0.1)
+                if self._paused:
+                    time.sleep(0.05)
                     continue
 
-                # 获取活动流
-                stream = self._get_active_stream()
-                if not stream:
-                    logger.error("无法获取活动音频流")
-                    time.sleep(RETRY_DELAY)
+                audio_data = self._read_audio_data()
+                if audio_data is None:
                     continue
 
-                # 检查流状态
-                if not stream.is_active():
-                    logger.warning("音频流未激活，尝试重新初始化")
-                    if self.audio_codec:
-                        self.audio_codec._reinitialize_stream(is_input=True)
-                    time.sleep(RETRY_DELAY)
-                    continue
-
-                # 读取音频数据
-                data = self._read_audio_data(stream)
-                if data is None:
-                    error_count += 1
-                    if error_count >= MAX_ERRORS:
-                        logger.error(f"检测循环错误({error_count}/{MAX_ERRORS}): 无法读取音频数据")
-                        if self.audio_codec:
-                            self.audio_codec._reinitialize_stream(is_input=True)
-                        time.sleep(RETRY_DELAY)
-                        continue
-                    time.sleep(0.1)
-                    continue
-
-                # 处理音频数据
-                if self._process_audio_data(data):
-                    error_count = 0  # 重置错误计数
-                else:
-                    error_count += 1
-                    if error_count >= MAX_ERRORS:
-                        logger.error(f"检测循环错误({error_count}/{MAX_ERRORS}): 音频处理失败")
-                        if self.audio_codec:
-                            self.audio_codec._reinitialize_stream(is_input=True)
-                        time.sleep(RETRY_DELAY)
-                        continue
-
+                self._process_audio_data(audio_data)
+                error_count = 0  # 成功时清零
             except Exception as e:
                 error_count += 1
-                logger.error(f"检测循环错误({error_count}/{MAX_ERRORS}): {str(e)}")
+                logger.error(f"检测循环错误({error_count}/{MAX_ERRORS}): {e}")
+
                 if error_count >= MAX_ERRORS:
+                    now = time.time()
+                    if now - last_reset_time < 2:
+                        logger.warning("初始化过于频繁，跳过这次")
+                        time.sleep(0.5)
+                        continue
+
                     logger.error("达到最大错误次数，尝试重新初始化")
-                    if self.audio_codec:
+                    last_reset_time = now
+                    try:
                         self.audio_codec._reinitialize_stream(is_input=True)
-                    time.sleep(RETRY_DELAY)
-                else:
-                    time.sleep(0.1)
+                        logger.info("音频输入流重新初始化成功")
+                    except Exception as reset_error:
+                        logger.exception(f"音频输入流重启失败: {reset_error}")
+                    error_count = 0  # 重置错误计数
 
     def _get_active_stream(self):
-        """获取活动音频流"""
-        with self.stream_lock:
-            if self.external_stream and self.stream:
-                if not hasattr(self.stream, "is_active") or self.stream.is_active():
-                    return self.stream
-                logger.warning("外部流未激活")
-            elif self.audio_codec and self.audio_codec.input_stream:
-                if self.audio_codec.input_stream.is_active():
-                    return self.audio_codec.input_stream
-                logger.warning("AudioCodec输入流未激活")
+        """获取活跃的音频流"""
+        if self.audio_codec:
+            if not hasattr(self.audio_codec, "input_stream"):
+                return None
+            stream = self.audio_codec.input_stream
+            if stream and stream.is_active():
+                return stream
+            # 尝试重新激活
+            if stream and hasattr(stream, "start_stream"):
+                try:
+                    stream.start_stream()
+                    return stream if stream.is_active() else None
+                except Exception:
+                    pass
             return None
+
+        return self.stream if self.stream and self.stream.is_active() else None
 
     def _read_audio_data(self, stream):
         """读取音频数据"""
         try:
+            stream = self.audio_codec.input_stream
             if not stream or not stream.is_active():
+                logger.warning("音频流未打开或不活跃，跳过本轮检测")
                 return None
 
-            # 检查可用数据
-            if hasattr(stream, "get_read_available"):
-                available = stream.get_read_available()
-                if available < self.buffer_size:
-                    return None
+            available = stream.get_read_available()
+            if available < self.audio_codec.INPUT_FRAME_SIZE:
+                time.sleep(0.01)  # 稍等
+                return None
 
-            # 读取数据
-            data = stream.read(self.buffer_size, exception_on_overflow=False)
-            if not data or len(data) != self.buffer_size * 2:  # 16位采样 = 2字节
+            data = stream.read(self.audio_codec.INPUT_FRAME_SIZE, exception_on_overflow=False)
+
+            if not isinstance(data, bytes) or len(data) != self.audio_codec.INPUT_FRAME_SIZE * 2:
+                logger.warning(f"读取到非法音频数据: 类型={type(data)}, 长度={len(data) if hasattr(data, '__len__') else 'N/A'}")
                 return None
 
             return data
         except Exception as e:
-            logger.error(f"读取音频数据失败: {e}")
+            logger.exception(f"读取音频数据失败: {e}")
             return None
 
     def _process_audio_data(self, data):
