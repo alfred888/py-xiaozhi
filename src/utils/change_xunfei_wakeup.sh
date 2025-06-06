@@ -22,6 +22,25 @@ def send_message(ser, message):
 	
 	return response
 
+def parse_response(response):
+	"""解析设备响应"""
+	if not response:
+		return False, "未收到响应"
+	
+	# 检查命令确认部分
+	if len(response) < 7:
+		return False, "响应数据不完整"
+	
+	# 检查命令确认
+	if response[0:7] != bytearray([0xA5, 0x01, 0x01, 0x04, 0x00, 0x00, 0x00]):
+		return False, "命令确认失败"
+	
+	# 检查状态响应
+	if len(response) >= 12 and response[7:11] == bytearray([0xA5, 0x00, 0x00, 0x00]):
+		return True, "设备状态正常"
+	
+	return True, "命令已发送，但状态响应异常"
+
 def changehuan():
 	"""生成修改唤醒词的消息"""
 	# 消息格式：A5 01 01 04 0000 [校验和]
@@ -46,14 +65,12 @@ def main():
 		# 发送修改唤醒词命令
 		response = send_message(ser, changehuan())
 		
-		# 检查响应
-		if response and len(response) >= 4:
-			if response[0] == 0xA5 and response[1] == 0x01:
-				print("唤醒词修改命令已发送")
-			else:
-				print(f"命令响应异常: {' '.join([f'{b:02x}' for b in response])}")
-		else:
-			print("命令发送失败：响应不完整")
+		# 解析响应
+		success, message = parse_response(response)
+		print(message)
+		
+		if success:
+			print("请重新上电设备以应用更改")
 		
 		# 关闭串口
 		ser.close()
