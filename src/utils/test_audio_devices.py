@@ -13,19 +13,18 @@ class AudioDeviceTester:
         self.record_dir = "mic_test_records"
         os.makedirs(self.record_dir, exist_ok=True)
         
-    def get_audio_devices(self):
-        """获取所有音频设备信息"""
-        devices = []
+    def find_device_by_name(self, target_name):
+        """查找指定名称的设备"""
         for i in range(self.p.get_device_count()):
             device_info = self.p.get_device_info_by_index(i)
-            if device_info['maxInputChannels'] > 0:  # 只获取输入设备
-                devices.append({
+            if target_name in device_info['name']:
+                return {
                     'index': i,
                     'name': device_info['name'],
                     'channels': device_info['maxInputChannels'],
                     'sample_rate': int(device_info['defaultSampleRate'])
-                })
-        return devices
+                }
+        return None
 
     def record_audio(self, device_index, duration=5):
         """录制音频"""
@@ -104,36 +103,25 @@ class AudioDeviceTester:
         
         print("播放完成")
 
-    def test_all_devices(self):
-        """测试所有音频设备"""
-        devices = self.get_audio_devices()
-        if not devices:
-            print("未找到音频输入设备")
+    def test_usb_camera(self):
+        """测试 USB Camera 音频设备"""
+        # 查找 USB Camera 设备
+        device = self.find_device_by_name("USB Camera")
+        if not device:
+            print("未找到 USB Camera 音频设备")
             return
         
-        print(f"找到 {len(devices)} 个音频输入设备:")
-        for i, device in enumerate(devices, 1):
-            print(f"{i}. {device['name']}")
+        print(f"找到 USB Camera 音频设备: {device['name']}")
         
-        recorded_files = []
-        
-        # 测试每个设备
-        for device in devices:
-            try:
-                filename = self.record_audio(device['index'])
-                recorded_files.append(filename)
-            except Exception as e:
-                print(f"设备 {device['name']} 录音失败: {e}")
-        
-        # 播放所有录音
-        if recorded_files:
-            print("\n开始播放所有录音...")
-            for filename in recorded_files:
-                try:
-                    self.play_audio(filename)
-                    input("按回车键继续播放下一个文件...")
-                except Exception as e:
-                    print(f"播放 {filename} 失败: {e}")
+        try:
+            # 录音
+            filename = self.record_audio(device['index'])
+            
+            # 播放
+            self.play_audio(filename)
+            
+        except Exception as e:
+            print(f"测试失败: {e}")
         
         print("\n测试完成！")
 
@@ -144,7 +132,7 @@ class AudioDeviceTester:
 def main():
     tester = AudioDeviceTester()
     try:
-        tester.test_all_devices()
+        tester.test_usb_camera()
     finally:
         tester.close()
 
