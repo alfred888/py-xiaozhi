@@ -53,8 +53,8 @@ def main():
     args = parse_args()
 
     try:
-        # 设置日志
-        setup_logging(log_level=args.log_level)
+        # 日志
+        setup_logging()
         logger.info("正在启动无界面版小智Ai客户端...")
 
         # 创建并运行应用程序
