@@ -9,10 +9,10 @@ if [ ! -d "$RECORD_DIR" ]; then
     exit 1
 fi
 
-# 获取最新的录音文件
-LATEST_FILES=$(ls -t "$RECORD_DIR"/*.wav 2>/dev/null | head -n 4)
+# 获取最新的录音文件（使用数组来正确处理文件名）
+mapfile -t LATEST_FILES < <(ls -t "$RECORD_DIR"/*.wav 2>/dev/null | head -n 4)
 
-if [ -z "$LATEST_FILES" ]; then
+if [ ${#LATEST_FILES[@]} -eq 0 ]; then
     echo "错误: 没有找到录音文件"
     exit 1
 fi
@@ -21,7 +21,12 @@ echo "开始播放最新的录音文件..."
 echo "----------------------------------------"
 
 # 播放每个文件
-for file in $LATEST_FILES; do
+for file in "${LATEST_FILES[@]}"; do
+    if [ ! -f "$file" ]; then
+        echo "警告: 文件不存在: $file"
+        continue
+    fi
+    
     filename=$(basename "$file")
     echo "正在播放: $filename"
     
