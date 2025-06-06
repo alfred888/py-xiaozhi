@@ -64,24 +64,41 @@ class AudioCodec:
         try:
             # 查找XFM-DP-V0.0.18设备
             device_index = None
+            device_info = None
             for i in range(self.audio.get_device_count()):
-                device_info = self.audio.get_device_info_by_index(i)
-                if is_input and device_info["maxInputChannels"] > 0:
-                    if "XFM-DP-V0.0.18" in device_info["name"]:
+                info = self.audio.get_device_info_by_index(i)
+                if is_input and info["maxInputChannels"] > 0:
+                    if "XFM-DP-V0.0.18" in info["name"]:
                         device_index = i
-                        logger.info(f"选择输入设备: {device_info['name']} (索引: {i})")
+                        device_info = info
+                        logger.info(f"选择输入设备: {info['name']} (索引: {i})")
                         break
             
             # 如果找不到XFM-DP-V0.0.18设备，使用默认设备
             if is_input and device_index is None:
                 logger.warning("未找到XFM-DP-V0.0.18设备，使用默认输入设备")
                 device_index = self.audio.get_default_input_device_info()["index"]
-                logger.info(f"使用默认输入设备: {self.audio.get_device_info_by_index(device_index)['name']}")
+                device_info = self.audio.get_device_info_by_index(device_index)
+                logger.info(f"使用默认输入设备: {device_info['name']}")
+
+            # 获取设备支持的采样率
+            if device_info:
+                default_rate = int(device_info.get('defaultSampleRate', 16000))
+                logger.info(f"设备默认采样率: {default_rate}Hz")
+                
+                # 如果设备不支持48000Hz，使用设备默认采样率
+                if is_input and default_rate != AudioConfig.INPUT_SAMPLE_RATE:
+                    logger.warning(f"设备不支持{AudioConfig.INPUT_SAMPLE_RATE}Hz采样率，使用设备默认采样率{default_rate}Hz")
+                    sample_rate = default_rate
+                else:
+                    sample_rate = AudioConfig.INPUT_SAMPLE_RATE if is_input else AudioConfig.OUTPUT_SAMPLE_RATE
+            else:
+                sample_rate = AudioConfig.INPUT_SAMPLE_RATE if is_input else AudioConfig.OUTPUT_SAMPLE_RATE
 
             params = {
                 "format": pyaudio.paInt16,
                 "channels": AudioConfig.CHANNELS,
-                "rate": AudioConfig.INPUT_SAMPLE_RATE if is_input else AudioConfig.OUTPUT_SAMPLE_RATE,
+                "rate": sample_rate,
                 "input": is_input,
                 "output": not is_input,
                 "frames_per_buffer": AudioConfig.INPUT_FRAME_SIZE if is_input else AudioConfig.OUTPUT_FRAME_SIZE,
