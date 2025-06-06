@@ -126,7 +126,7 @@ class AudioCodec:
             return self._is_input_paused
 
     def read_audio(self):
-        """（优化缓冲区管理 + 安全编码）"""
+        """（优化缓冲区管理）"""
         if self.is_input_paused():
             return None
 
@@ -137,39 +137,33 @@ class AudioCodec:
                     if not self._reinitialize_stream(is_input=True):
                         return None
 
-                # 动态缓冲区调整
+                # 动态缓冲区调整 - 实时性能优化
                 available = self.input_stream.get_read_available()
-                if available > AudioConfig.INPUT_FRAME_SIZE * 2:
-                    skip_samples = available - (AudioConfig.INPUT_FRAME_SIZE * 1.5)
-                    if skip_samples > 0:
-                        self.input_stream.read(int(skip_samples), exception_on_overflow=False)
-                        logger.debug(f"跳过 {skip_samples} 个样本减少延迟")
+                if available > AudioConfig.INPUT_FRAME_SIZE * 2:  # 降低阈值从3倍到2倍
+                    skip_samples = available - (
+                        AudioConfig.INPUT_FRAME_SIZE * 1.5
+                    )  # 减少保留量
+                    if skip_samples > 0:  # 增加安全检查
+                        self.input_stream.read(
+                            int(skip_samples), exception_on_overflow=False  # 确保整数
+                        )
+                        logger.debug(f"跳过{skip_samples}个样本减少延迟")
 
                 # 读取数据
-                data = self.input_stream.read(AudioConfig.INPUT_FRAME_SIZE, exception_on_overflow=False)
+                data = self.input_stream.read(
+                    AudioConfig.INPUT_FRAME_SIZE, exception_on_overflow=False
+                )
 
-                # 类型和长度检查
-                if not isinstance(data, bytes):
-                    logger.error(f"音频读取返回非法类型: {type(data)}")
-                    return None
-
+                # 数据验证
                 if len(data) != AudioConfig.INPUT_FRAME_SIZE * 2:
-                    logger.warning(f"音频数据长度异常: {len(data)}，应为 {AudioConfig.INPUT_FRAME_SIZE * 2}")
+                    logger.warning("音频数据长度异常，重置输入流")
                     self._reinitialize_stream(is_input=True)
                     return None
 
-                # 调试日志（可选）
-                logger.debug(f"音频数据样例: {repr(data[:10])}")
+                return self.opus_encoder.encode(data, AudioConfig.INPUT_FRAME_SIZE)
 
-                # 编码（安全包裹）
-                try:
-                    return self.opus_encoder.encode(data, AudioConfig.INPUT_FRAME_SIZE)
-                except Exception:
-                    logger.exception("Opus 编码失败")
-                    return None
-
-        except Exception:
-            logger.exception("音频读取失败")
+        except Exception as e:
+            logger.error(f"音频读取失败: {e}")
             self._reinitialize_stream(is_input=True)
             return None
 
