@@ -201,7 +201,7 @@ class WakeWordDetector:
 
         while self.running:
             try:
-                if self._paused:
+                if self.paused:
                     time.sleep(0.05)
                     continue
 
