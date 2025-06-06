@@ -737,7 +737,11 @@ class WakeWordDetector:
                 return False
 
             # 检查输入设备
-            pa = self.audio_codec.p
+            if not hasattr(self.audio_codec, "audio"):
+                logger.warning("AudioCodec没有音频实例")
+                return False
+
+            pa = self.audio_codec.audio
             input_devices = []
             for i in range(pa.get_device_count()):
                 device_info = pa.get_device_info_by_index(i)
