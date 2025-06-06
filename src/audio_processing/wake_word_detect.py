@@ -199,7 +199,7 @@ class WakeWordDetector:
         MAX_ERRORS = 5
         last_reset_time = 0
 
-        while self._running:
+        while self.running:
             try:
                 if self._paused:
                     time.sleep(0.05)
