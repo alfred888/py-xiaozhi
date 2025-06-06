@@ -9,6 +9,7 @@ from pathlib import Path
 
 from pypinyin import Style, lazy_pinyin
 from vosk import KaldiRecognizer, Model, SetLogLevel
+import numpy as np
 
 from src.constants.constants import AudioConfig
 from src.utils.config_manager import ConfigManager
@@ -313,7 +314,10 @@ class WakeWordDetector:
             try:
                 # 检查可用数据
                 available = stream.get_read_available()
+                logger.debug(f"音频流可用数据: {available} 样本")
+                
                 if available < self.buffer_size:
+                    logger.debug(f"可用数据不足: {available} < {self.buffer_size}，等待更多数据")
                     time.sleep(0.01)  # 等待更多数据
                     return None
 
@@ -327,7 +331,21 @@ class WakeWordDetector:
                     logger.warning(f"读取到非法音频数据: 类型={type(data)}, 长度={len(data) if hasattr(data, '__len__') else 'N/A'}")
                     return None
 
-                logger.debug(f"成功读取音频数据，前10字节: {data[:10]}")
+                # 分析音频数据
+                try:
+                    audio_data = np.frombuffer(data, dtype=np.int16)
+                    max_amplitude = np.max(np.abs(audio_data))
+                    mean_amplitude = np.mean(np.abs(audio_data))
+                    logger.debug(f"音频数据统计: 最大振幅={max_amplitude}, 平均振幅={mean_amplitude:.2f}")
+                    
+                    # 如果振幅太小，可能是静音
+                    if max_amplitude < 100:  # 可以调整这个阈值
+                        logger.debug("检测到静音或音量过低")
+                    else:
+                        logger.debug(f"成功读取音频数据，前10字节: {data[:10]}")
+                except Exception as e:
+                    logger.warning(f"音频数据分析失败: {e}")
+
                 return data
             except Exception as e:
                 if "Unanticipated host error" in str(e):
@@ -749,7 +767,8 @@ class WakeWordDetector:
                     input_devices.append({
                         "index": i,
                         "name": device_info["name"],
-                        "channels": device_info["maxInputChannels"]
+                        "channels": device_info["maxInputChannels"],
+                        "defaultSampleRate": device_info["defaultSampleRate"]
                     })
 
             if not input_devices:
@@ -781,8 +800,31 @@ class WakeWordDetector:
                     if not test_data:
                         logger.warning("无法从麦克风读取数据")
                         return False
-                    logger.debug("麦克风工作正常")
-                    return True
+                    
+                    # 分析测试数据
+                    try:
+                        audio_data = np.frombuffer(test_data, dtype=np.int16)
+                        max_amplitude = np.max(np.abs(audio_data))
+                        mean_amplitude = np.mean(np.abs(audio_data))
+                        logger.debug(f"麦克风测试数据: 最大振幅={max_amplitude}, 平均振幅={mean_amplitude:.2f}")
+                        
+                        # 检查是否有声音输入
+                        if max_amplitude < 100:  # 可以调整这个阈值
+                            logger.debug("麦克风可能处于静音状态")
+                        else:
+                            logger.debug("检测到有效的声音输入")
+                            
+                        # 检查数据格式
+                        if len(test_data) != 2048:  # 1024 samples * 2 bytes per sample
+                            logger.warning(f"测试数据长度异常: {len(test_data)} != 2048")
+                            return False
+                            
+                        logger.debug("麦克风工作正常")
+                        return True
+                    except Exception as e:
+                        logger.error(f"分析麦克风测试数据时出错: {e}")
+                        return False
+                        
                 except Exception as e:
                     logger.error(f"读取麦克风数据时出错: {e}")
                     return False

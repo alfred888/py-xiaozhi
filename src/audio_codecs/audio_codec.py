@@ -128,17 +128,23 @@ class AudioCodec:
     def read_audio(self):
         """（优化缓冲区管理）"""
         if self.is_input_paused():
+            logger.debug("音频输入已暂停，跳过读取")
             return None
 
         try:
             with self._stream_lock:
                 # 流状态检查优化
                 if not self.input_stream or not self.input_stream.is_active():
+                    logger.warning("输入流未激活，尝试重新初始化")
                     if not self._reinitialize_stream(is_input=True):
+                        logger.error("重新初始化输入流失败")
                         return None
+                    logger.info("输入流重新初始化成功")
 
                 # 动态缓冲区调整 - 实时性能优化
                 available = self.input_stream.get_read_available()
+                logger.debug(f"当前可用音频数据: {available} 样本")
+                
                 if available > AudioConfig.INPUT_FRAME_SIZE * 2:  # 降低阈值从3倍到2倍
                     skip_samples = available - (
                         AudioConfig.INPUT_FRAME_SIZE * 1.5
@@ -153,14 +159,31 @@ class AudioCodec:
                 data = self.input_stream.read(
                     AudioConfig.INPUT_FRAME_SIZE, exception_on_overflow=False
                 )
+                
+                # 记录音频数据的基本信息
+                if data:
+                    audio_data = np.frombuffer(data, dtype=np.int16)
+                    max_amplitude = np.max(np.abs(audio_data))
+                    logger.debug(f"读取到音频数据: 长度={len(data)}, 最大振幅={max_amplitude}")
+                    
+                    # 如果振幅太小，可能是静音
+                    if max_amplitude < 100:  # 可以调整这个阈值
+                        logger.debug("检测到静音或音量过低")
 
                 # 数据验证
                 if len(data) != AudioConfig.INPUT_FRAME_SIZE * 2:
-                    logger.warning("音频数据长度异常，重置输入流")
+                    logger.warning(f"音频数据长度异常: {len(data)} != {AudioConfig.INPUT_FRAME_SIZE * 2}，重置输入流")
                     self._reinitialize_stream(is_input=True)
                     return None
 
-                return self.opus_encoder.encode(data, AudioConfig.INPUT_FRAME_SIZE)
+                # 编码前记录原始数据
+                try:
+                    encoded_data = self.opus_encoder.encode(data, AudioConfig.INPUT_FRAME_SIZE)
+                    logger.debug(f"音频编码成功: 原始大小={len(data)}, 编码后大小={len(encoded_data)}")
+                    return encoded_data
+                except Exception as e:
+                    logger.error(f"音频编码失败: {e}")
+                    return None
 
         except Exception as e:
             logger.error(f"音频读取失败: {e}")
