@@ -160,10 +160,42 @@ class AudioCodec:
                     self._reinitialize_stream(is_input=True)
                     return None
 
-                return self.opus_encoder.encode(data, AudioConfig.INPUT_FRAME_SIZE)
+                try:
+                    # 确保数据是16位PCM格式
+                    pcm_data = np.frombuffer(data, dtype=np.int16)
+                    
+                    # 检查数据有效性
+                    if pcm_data.size != AudioConfig.INPUT_FRAME_SIZE:
+                        logger.warning(f"PCM数据大小不匹配: 期望 {AudioConfig.INPUT_FRAME_SIZE}, 实际 {pcm_data.size}")
+                        return None
+                    
+                    # 检查数据类型
+                    if pcm_data.dtype != np.int16:
+                        logger.warning(f"PCM数据类型错误: {pcm_data.dtype}")
+                        return None
+                    
+                    # 检查数据范围
+                    if np.max(np.abs(pcm_data)) > 32767:
+                        logger.warning("PCM数据超出有效范围")
+                        return None
 
-        except Exception as e:
-            logger.error(f"音频读取失败: {e}")
+                    # 编码音频数据
+                    try:
+                        encoded_data = self.opus_encoder.encode(pcm_data.tobytes(), AudioConfig.INPUT_FRAME_SIZE)
+                        if encoded_data is None:
+                            logger.warning("Opus编码返回空数据")
+                            return None
+                        return encoded_data
+                    except opuslib.OpusError as e:
+                        logger.error(f"Opus编码失败: {e}")
+                        return None
+
+                except Exception as e:
+                    logger.error(f"音频数据处理失败: {e}")
+                    return None
+
+        except Exception:
+            logger.exception("音频读取失败")
             self._reinitialize_stream(is_input=True)
             return None
 
