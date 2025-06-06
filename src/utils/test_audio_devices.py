@@ -22,15 +22,15 @@ class AudioDeviceTester:
                     'index': i,
                     'name': device_info['name'],
                     'channels': device_info['maxInputChannels'],
-                    'sample_rate': int(device_info['defaultSampleRate'])
+                    'sample_rate': 48000  # 强制使用 48000Hz 采样率
                 }
         return None
 
     def record_audio(self, device_index, duration=5):
         """录制音频"""
         device_info = self.p.get_device_info_by_index(device_index)
-        sample_rate = int(device_info['defaultSampleRate'])
-        channels = int(device_info['maxInputChannels'])
+        sample_rate = 48000  # 强制使用 48000Hz 采样率
+        channels = 1  # 强制使用单声道
         
         # 生成文件名
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
