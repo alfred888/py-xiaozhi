@@ -3,6 +3,7 @@ import base64
 import logging
 import threading
 
+import numpy as np  # 确保numpy在cv2之前导入
 import cv2
 
 from src.application import Application
