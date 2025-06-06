@@ -335,13 +335,13 @@ def create_optimized_apm_config():
 class WebRTCProcessor:
     """WebRTC音频处理器，提供实时回声消除和音频增强功能"""
 
-    def __init__(self, sample_rate=16000, channels=1, frame_size=160):
+    def __init__(self, sample_rate=48000, channels=1, frame_size=480):
         """初始化WebRTC处理器
 
         Args:
-            sample_rate: 采样率，默认16000Hz
+            sample_rate: 采样率，默认48000Hz
             channels: 声道数，默认1（单声道）
-            frame_size: 帧大小，默认160样本（10ms @ 16kHz）
+            frame_size: 帧大小，默认480样本（10ms @ 48kHz）
         """
         self.sample_rate = sample_rate
         self.channels = channels

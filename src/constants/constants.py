@@ -88,22 +88,24 @@ class AudioConfig:
     """音频配置类"""
 
     # 固定配置
-    INPUT_SAMPLE_RATE = 48000  # USB Camera 麦克风的采样率
-    OUTPUT_SAMPLE_RATE = 48000  # 保持与输入采样率一致
-    CHANNELS = 1  # 单声道
+    INPUT_SAMPLE_RATE = 48000  # 输入采样率48kHz
+    # 输出采样率：官方服务器使用24kHz，其他使用16kHz
+    _ota_url = config.get_config("SYSTEM_OPTIONS.NETWORK.OTA_VERSION_URL")
+    OUTPUT_SAMPLE_RATE = 24000 if is_official_server(_ota_url) else 16000
+    CHANNELS = 1
 
     # 动态获取帧长度
     FRAME_DURATION = get_frame_duration()
 
     # 根据不同采样率计算帧大小
     INPUT_FRAME_SIZE = int(INPUT_SAMPLE_RATE * (FRAME_DURATION / 1000))
-    # 统一使用固定帧大小
-    OUTPUT_FRAME_SIZE = 4096
+    # Linux系统使用固定帧大小以减少PCM打印，其他系统动态计算
+    OUTPUT_FRAME_SIZE = (
+        4096
+        if platform.system() == "Linux"
+        else int(OUTPUT_SAMPLE_RATE * (FRAME_DURATION / 1000))
+    )
 
     # Opus编码配置
-    OPUS_APPLICATION = 2048  # OPUS_APPLICATION_VOIP
+    OPUS_APPLICATION = 2049  # OPUS_APPLICATION_AUDIO
     OPUS_FRAME_SIZE = INPUT_FRAME_SIZE  # 使用输入采样率的帧大小
-
-    # 音频设备配置
-    INPUT_DEVICE = "hw:2,0"  # USB Camera 麦克风设备
-    OUTPUT_DEVICE = "hw:3,0"  # USB PnP Audio Device 作为输出设备
