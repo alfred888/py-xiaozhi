@@ -25,9 +25,9 @@ def changehuan():
 
 def main():
 	try:
-		# 打开串口
-		ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
-		print("已连接到串口设备")
+		# 打开串口（使用新的设备别名）
+		ser = serial.Serial('/dev/xunfei_mic', 115200, timeout=1)
+		print("已连接到讯飞麦克风设备")
 		
 		# 发送修改唤醒词命令
 		response = send_message(ser, changehuan())
@@ -43,6 +43,7 @@ def main():
 		
 	except serial.SerialException as e:
 		print(f"串口错误: {e}")
+		print("请确保已运行 install_mic_rules.sh 并重新插拔设备")
 	except Exception as e:
 		print(f"发生错误: {e}")
 
