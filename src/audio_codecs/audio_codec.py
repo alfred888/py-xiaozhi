@@ -81,10 +81,10 @@ class AudioCodec:
             params = {
                 "format": pyaudio.paInt16,
                 "channels": AudioConfig.CHANNELS,
-                "rate": AudioConfig.SAMPLE_RATE,
+                "rate": AudioConfig.INPUT_SAMPLE_RATE if is_input else AudioConfig.OUTPUT_SAMPLE_RATE,
                 "input": is_input,
                 "output": not is_input,
-                "frames_per_buffer": AudioConfig.INPUT_FRAME_SIZE,
+                "frames_per_buffer": AudioConfig.INPUT_FRAME_SIZE if is_input else AudioConfig.OUTPUT_FRAME_SIZE,
                 "stream_callback": None,
             }
 
