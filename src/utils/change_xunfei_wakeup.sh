@@ -1,68 +1,50 @@
+#!/usr/bin/env python3
 import serial
+import time
+import sys
 
-ser = serial.Serial('/dev/wheeltec_mic', 115200)
+def send_message(ser, message):
+	"""发送消息并等待响应"""
+	print(f"发送: {' '.join([f'{b:02x}' for b in message])}")
+	ser.write(message)
+	time.sleep(0.1)
+	response = ser.read(4)
+	print(f"接收: {' '.join([f'{b:02x}' for b in response])}")
+	return response
 
 def changehuan():
-	head=0xA5
-	userid=0x01
-	msgtype=0x05
-															#唤醒词
-	msg=b'{"type": "wakeup_keywords","content": {"keyword": "ni2 hao3 le4 di2","threshold": "900"}}\n'
-	msglen_byte = len(msg).to_bytes(2, 'big') 
+	"""生成修改唤醒词的消息"""
+	# 消息格式：A5 01 01 04 0000 [校验和]
+	message = bytearray([0xA5, 0x01, 0x01, 0x04, 0x00, 0x00])
+	
+	# 计算校验和（只取低8位）
+	checksum = sum(message) & 0xFF
+	message.append(checksum)
+	
+	return message
 
-	msg_l = msglen_byte[1]
-	msg_h= msglen_byte[0]
-	msgid_l=0x01
-	msgid_h=0x00
-	checksum = ((~sum([head, userid, msgtype, msg_l, msg_h, msgid_l, msgid_h] + list(msg))) & 0xFF) +1
-	head_byte = head.to_bytes(1, 'big')
-	userid_byte = userid.to_bytes(1, 'big')
-	msgtype_byte = msgtype.to_bytes(1, 'big')
-	msg_l_byte = msg_l.to_bytes(1, 'big')
-	msg_h_byte = msg_h.to_bytes(1, 'big')
-	msgid_l_byte = msgid_l.to_bytes(1, 'big')
-	msgid_h_byte = msgid_h.to_bytes(1, 'big')
-	checksum_byte = checksum.to_bytes(1, 'big')
-	complete_msg = head_byte + userid_byte + msgtype_byte + msg_l_byte + msg_h_byte + msgid_l_byte + msgid_h_byte + msg + checksum_byte
-	return complete_msg
+def main():
+	try:
+		# 打开串口
+		ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+		print("已连接到串口设备")
+		
+		# 发送修改唤醒词命令
+		response = send_message(ser, changehuan())
+		
+		# 检查响应
+		if response and response[0] == 0xA5 and response[1] == 0x00:
+			print("唤醒词修改命令已发送")
+		else:
+			print("命令发送失败")
+		
+		# 关闭串口
+		ser.close()
+		
+	except serial.SerialException as e:
+		print(f"串口错误: {e}")
+	except Exception as e:
+		print(f"发生错误: {e}")
 
-
-
-while 1:
-	head = ser.read(1).hex()
-	if head != "a5":
-		continue
-
-	userid = ser.read(1).hex()
-	msgtype = ser.read(1).hex()
-
-	len_l=ser.read(1).hex()
-	len_h=ser.read(1).hex()	
-	data_len = int(len_h+len_l, 16)
-
-	msgid = ser.read(2).hex()
-	data = ser.read(data_len)
-	check = ser.read(1).hex()
-	print(head,userid,msgtype,data_len,msgid,data,check)
-	break
-
-ser.write(changehuan())
-
-while 1:
-	head = ser.read(1).hex()
-	if head == "a5":
-		userid = ser.read(1).hex()
-		msgtype = ser.read(1).hex()
-
-		len_l=ser.read(1).hex()
-		len_h=ser.read(1).hex()	
-		data_len = int(len_h+len_l, 16)
-
-		msgid = ser.read(2).hex()
-		data = ser.read(data_len)
-		check = ser.read(1).hex()
-		if msgtype=="ff":
-			print("更改完成 请重新上电")
-			break
-
-ser.close()
+if __name__ == "__main__":
+	main()
