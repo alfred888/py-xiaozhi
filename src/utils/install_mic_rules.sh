@@ -6,6 +6,10 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# 显示当前连接的设备
+echo "当前连接的设备："
+ls -l /dev/tty* | grep -E "USB|ACM"
+
 # 复制规则文件到udev目录
 cp 99-xunfei-mic.rules /etc/udev/rules.d/
 
@@ -14,4 +18,13 @@ udevadm control --reload-rules
 udevadm trigger
 
 echo "讯飞麦克风设备规则已安装"
-echo "请重新插拔麦克风设备，然后可以通过 /dev/xunfei_mic 访问设备" 
+echo "请重新插拔麦克风设备，然后可以通过 /dev/xunfei_mic 访问设备"
+
+# 检查设备权限
+echo "检查设备权限："
+ls -l /dev/ttyACM*
+
+# 提示用户可能需要添加dialout组
+echo "如果遇到权限问题，请运行："
+echo "sudo usermod -a -G dialout $USER"
+echo "然后重新登录系统" 

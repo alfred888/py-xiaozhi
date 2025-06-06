@@ -1,2 +1,4 @@
 # 讯飞麦克风设备规则
-SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="xunfei_mic" 
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="xunfei_mic"
+# 添加ACM设备规则
+SUBSYSTEM=="tty", KERNEL=="ttyACM*", SYMLINK+="xunfei_mic" 
