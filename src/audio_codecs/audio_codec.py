@@ -61,24 +61,41 @@ class AudioCodec:
 
     def _create_stream(self, is_input=True):
         """流创建逻辑"""
-        params = {
-            "format": pyaudio.paInt16,
-            "channels": AudioConfig.CHANNELS,
-            "rate": (
-                AudioConfig.INPUT_SAMPLE_RATE
-                if is_input
-                else AudioConfig.OUTPUT_SAMPLE_RATE
-            ),
-            "input" if is_input else "output": True,
-            "frames_per_buffer": (
-                AudioConfig.INPUT_FRAME_SIZE
-                if is_input
-                else AudioConfig.OUTPUT_FRAME_SIZE
-            ),
-            "start": False,
-        }
+        try:
+            # 查找XFM-DP-V0.0.18设备
+            device_index = None
+            for i in range(self.audio.get_device_count()):
+                device_info = self.audio.get_device_info_by_index(i)
+                if is_input and device_info["maxInputChannels"] > 0:
+                    if "XFM-DP-V0.0.18" in device_info["name"]:
+                        device_index = i
+                        logger.info(f"选择输入设备: {device_info['name']} (索引: {i})")
+                        break
+            
+            # 如果找不到XFM-DP-V0.0.18设备，使用默认设备
+            if is_input and device_index is None:
+                logger.warning("未找到XFM-DP-V0.0.18设备，使用默认输入设备")
+                device_index = self.audio.get_default_input_device_info()["index"]
+                logger.info(f"使用默认输入设备: {self.audio.get_device_info_by_index(device_index)['name']}")
 
-        return self.audio.open(**params)
+            params = {
+                "format": pyaudio.paInt16,
+                "channels": AudioConfig.CHANNELS,
+                "rate": AudioConfig.SAMPLE_RATE,
+                "input": is_input,
+                "output": not is_input,
+                "frames_per_buffer": AudioConfig.INPUT_FRAME_SIZE,
+                "stream_callback": None,
+            }
+
+            # 添加设备索引
+            if is_input and device_index is not None:
+                params["input_device_index"] = device_index
+
+            return self.audio.open(**params)
+        except Exception as e:
+            logger.error(f"创建音频流失败: {e}")
+            raise
 
     def _reinitialize_stream(self, is_input=True):
         """通用流重建方法"""
