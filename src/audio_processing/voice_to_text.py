@@ -139,46 +139,58 @@ class VoiceToText:
         
     def _create_audio_stream(self, device_index, sample_rate):
         """创建音频流"""
-        try:
-            # 尝试使用PulseAudio
-            stream = self.audio.open(
-                format=pyaudio.paInt16,
-                channels=AudioConfig.CHANNELS,
-                rate=sample_rate,
-                input=True,
-                input_device_index=device_index,
-                frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE,
-                stream_callback=None,
-                start=True  # 直接启动流
-            )
-            
-            # 等待流启动
-            time.sleep(0.1)
-            
-            # 测试流是否可用
+        # 尝试不同的音频格式
+        formats_to_try = [
+            pyaudio.paInt16,    # 16位整数
+            pyaudio.paFloat32,  # 32位浮点
+            pyaudio.paInt32     # 32位整数
+        ]
+        
+        for format in formats_to_try:
             try:
-                test_data = stream.read(1024, exception_on_overflow=False)
-                if not test_data:
-                    raise Exception("无法从音频流读取数据")
-                return stream
+                logger.info(f"尝试使用音频格式: {format}")
+                # 尝试使用PulseAudio
+                stream = self.audio.open(
+                    format=format,
+                    channels=AudioConfig.CHANNELS,
+                    rate=sample_rate,
+                    input=True,
+                    input_device_index=device_index,
+                    frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE,
+                    stream_callback=None,
+                    start=True  # 直接启动流
+                )
+                
+                # 等待流启动
+                time.sleep(0.1)
+                
+                # 测试流是否可用
+                try:
+                    test_data = stream.read(1024, exception_on_overflow=False)
+                    if not test_data:
+                        raise Exception("无法从音频流读取数据")
+                    logger.info(f"成功使用音频格式: {format}")
+                    return stream
+                except Exception as e:
+                    logger.error(f"测试音频流失败: {e}")
+                    if stream:
+                        try:
+                            stream.stop_stream()
+                            stream.close()
+                        except:
+                            pass
+                    continue
+                
             except Exception as e:
-                logger.error(f"测试音频流失败: {e}")
-                if stream:
+                logger.error(f"创建音频流失败: {e}")
+                if 'stream' in locals() and stream:
                     try:
-                        stream.stop_stream()
                         stream.close()
                     except:
                         pass
-                return None
-            
-        except Exception as e:
-            logger.error(f"创建音频流失败: {e}")
-            if 'stream' in locals() and stream:
-                try:
-                    stream.close()
-                except:
-                    pass
-            return None
+                continue
+        
+        return None
         
     def _recognition_loop(self):
         """语音识别主循环"""
@@ -195,10 +207,10 @@ class VoiceToText:
             
             # 尝试不同的采样率
             sample_rates_to_try = [
-                default_rate,                   # 设备默认采样率
                 16000,                          # 常用采样率
                 44100,                          # 标准采样率
                 48000,                          # 高采样率
+                default_rate,                   # 设备默认采样率
                 AudioConfig.INPUT_SAMPLE_RATE   # 配置的采样率
             ]
             
