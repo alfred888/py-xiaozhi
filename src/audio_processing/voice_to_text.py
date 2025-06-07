@@ -104,16 +104,14 @@ class VoiceToText:
     def _create_audio_stream(self, device_index, sample_rate):
         """创建音频流"""
         try:
-            # 尝试使用PulseAudio
+            # 使用最基本的音频配置
             stream = self.audio.open(
-                format=pyaudio.paInt16,
-                channels=AudioConfig.CHANNELS,
-                rate=sample_rate,
-                input=True,
+                format=pyaudio.paInt16,    # 16位整数格式
+                channels=1,                # 单声道
+                rate=16000,               # 16kHz采样率
+                input=True,               # 输入流
                 input_device_index=device_index,
-                frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE,
-                stream_callback=None,
-                start=True  # 直接启动流
+                frames_per_buffer=1024    # 固定缓冲区大小
             )
             
             # 等待流启动
