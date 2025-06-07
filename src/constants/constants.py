@@ -87,7 +87,7 @@ def get_frame_duration() -> int:
 class AudioConfig:
     """音频配置类"""
 
-    INPUT_SAMPLE_RATE = 48000
+    INPUT_SAMPLE_RATE = 16000
     OUTPUT_SAMPLE_RATE = 24000 if is_official_server(config.get_config("SYSTEM_OPTIONS.NETWORK.OTA_VERSION_URL")) else 16000
     CHANNELS = 1
 
