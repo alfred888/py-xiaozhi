@@ -27,6 +27,7 @@ class VoiceToText:
         self.running = False
         self.thread = None
         self.on_text_callback = None
+        self.stream_lock = threading.Lock()
         
         # 初始化语音识别模型
         self._init_model()
@@ -100,6 +101,95 @@ class VoiceToText:
             
         return device_index, device_info
             
+    def _create_audio_stream(self, device_index, sample_rate):
+        """创建音频流"""
+        try:
+            # 尝试使用PulseAudio
+            stream = self.audio.open(
+                format=pyaudio.paInt16,
+                channels=AudioConfig.CHANNELS,
+                rate=sample_rate,
+                input=True,
+                input_device_index=device_index,
+                frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE,
+                stream_callback=None,
+                start=True  # 直接启动流
+            )
+            
+            # 等待流启动
+            time.sleep(0.1)
+            
+            # 测试流是否可用
+            try:
+                test_data = stream.read(1024, exception_on_overflow=False)
+                if not test_data:
+                    raise Exception("无法从音频流读取数据")
+                return stream
+            except Exception as e:
+                logger.error(f"测试音频流失败: {e}")
+                if stream:
+                    try:
+                        stream.stop_stream()
+                        stream.close()
+                    except:
+                        pass
+                return None
+            
+        except Exception as e:
+            logger.error(f"创建音频流失败: {e}")
+            if 'stream' in locals() and stream:
+                try:
+                    stream.close()
+                except:
+                    pass
+            return None
+            
+    def _check_microphone_status(self):
+        """检查麦克风状态"""
+        try:
+            if not self.stream:
+                return False
+                
+            if not self.stream.is_active():
+                return False
+                
+            # 尝试读取一小段数据
+            with self.stream_lock:
+                test_data = self.stream.read(1024, exception_on_overflow=False)
+                return len(test_data) > 0
+                
+        except Exception as e:
+            logger.error(f"检查麦克风状态失败: {e}")
+            return False
+            
+    def _reset_stream(self):
+        """重置音频流"""
+        try:
+            if self.stream:
+                with self.stream_lock:
+                    try:
+                        self.stream.stop_stream()
+                        self.stream.close()
+                    except Exception as e:
+                        logger.error(f"关闭旧音频流失败: {e}")
+                    finally:
+                        self.stream = None
+                        
+            # 重新创建流
+            device_index, device_info = self._find_input_device()
+            sample_rate = int(device_info.get('defaultSampleRate', 16000))
+            self.stream = self._create_audio_stream(device_index, sample_rate)
+            
+            if not self.stream:
+                raise Exception("无法重新创建音频流")
+                
+            logger.info("音频流重置成功")
+            return True
+            
+        except Exception as e:
+            logger.error(f"重置音频流失败: {e}")
+            return False
+        
     def start(self, on_text_callback: Optional[Callable[[str], None]] = None):
         """启动语音转文字
         
@@ -136,61 +226,6 @@ class VoiceToText:
                 self.stream = None
             
         logger.info("语音转文字已停止")
-        
-    def _create_audio_stream(self, device_index, sample_rate):
-        """创建音频流"""
-        # 尝试不同的音频格式
-        formats_to_try = [
-            pyaudio.paInt16,    # 16位整数
-            pyaudio.paFloat32,  # 32位浮点
-            pyaudio.paInt32     # 32位整数
-        ]
-        
-        for format in formats_to_try:
-            try:
-                logger.info(f"尝试使用音频格式: {format}")
-                # 尝试使用PulseAudio
-                stream = self.audio.open(
-                    format=format,
-                    channels=AudioConfig.CHANNELS,
-                    rate=sample_rate,
-                    input=True,
-                    input_device_index=device_index,
-                    frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE,
-                    stream_callback=None,
-                    start=True  # 直接启动流
-                )
-                
-                # 等待流启动
-                time.sleep(0.1)
-                
-                # 测试流是否可用
-                try:
-                    test_data = stream.read(1024, exception_on_overflow=False)
-                    if not test_data:
-                        raise Exception("无法从音频流读取数据")
-                    logger.info(f"成功使用音频格式: {format}")
-                    return stream
-                except Exception as e:
-                    logger.error(f"测试音频流失败: {e}")
-                    if stream:
-                        try:
-                            stream.stop_stream()
-                            stream.close()
-                        except:
-                            pass
-                    continue
-                
-            except Exception as e:
-                logger.error(f"创建音频流失败: {e}")
-                if 'stream' in locals() and stream:
-                    try:
-                        stream.close()
-                    except:
-                        pass
-                continue
-        
-        return None
         
     def _recognition_loop(self):
         """语音识别主循环"""
@@ -234,20 +269,31 @@ class VoiceToText:
             self.stream = stream
             logger.info("开始语音识别循环")
             
+            error_count = 0
+            MAX_ERRORS = 5
+            RETRY_DELAY = 0.5
+            last_stream_check = 0
+            STREAM_CHECK_INTERVAL = 1.0  # 每秒检查一次流状态
+            
             while self.running:
                 try:
-                    # 检查流是否还在运行
-                    if not self.stream.is_active():
-                        logger.error("音频流已停止，尝试重新启动")
-                        try:
-                            self.stream.start_stream()
-                            time.sleep(0.1)  # 等待流启动
-                        except Exception as e:
-                            logger.error(f"重新启动音频流失败: {e}")
-                            break
+                    # 定期检查流状态
+                    current_time = time.time()
+                    if current_time - last_stream_check >= STREAM_CHECK_INTERVAL:
+                        last_stream_check = current_time
+                        if not self._check_microphone_status():
+                            logger.warning("麦克风状态异常，尝试重新初始化")
+                            if not self._reset_stream():
+                                error_count += 1
+                                if error_count >= MAX_ERRORS:
+                                    logger.error("达到最大错误次数，退出循环")
+                                    break
+                            time.sleep(RETRY_DELAY)
+                            continue
                     
                     # 读取音频数据
-                    data = self.stream.read(AudioConfig.INPUT_FRAME_SIZE, exception_on_overflow=False)
+                    with self.stream_lock:
+                        data = self.stream.read(AudioConfig.INPUT_FRAME_SIZE, exception_on_overflow=False)
                     
                     # 处理音频数据
                     if self.recognizer.AcceptWaveform(data):
@@ -259,22 +305,18 @@ class VoiceToText:
                             if self.on_text_callback:
                                 self.on_text_callback(text)
                                 
+                    error_count = 0  # 成功时清零
+                                
                 except Exception as e:
+                    error_count += 1
                     logger.error(f"处理音频数据时出错: {e}")
-                    # 如果是流关闭错误，尝试重新创建流
-                    if "Stream closed" in str(e) or "Stream is stopped" in str(e):
-                        logger.info("尝试重新创建音频流")
-                        try:
-                            if self.stream:
-                                self.stream.stop_stream()
-                                self.stream.close()
-                        except:
-                            pass
-                        self.stream = self._create_audio_stream(device_index, rate)
-                        if not self.stream:
-                            logger.error("重新创建音频流失败")
+                    if error_count >= MAX_ERRORS:
+                        logger.error("达到最大错误次数，尝试重新初始化")
+                        if not self._reset_stream():
+                            logger.error("重新初始化失败，退出循环")
                             break
-                    time.sleep(0.1)
+                        error_count = 0
+                    time.sleep(RETRY_DELAY)
                     
         except Exception as e:
             logger.error(f"语音识别循环出错: {e}")
