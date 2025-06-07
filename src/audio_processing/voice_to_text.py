@@ -6,8 +6,8 @@ from typing import Callable, Optional
 import pyaudio
 from vosk import KaldiRecognizer, Model, SetLogLevel
 
-from src.constants.constants import AudioConfig
-from src.utils.logging_config import get_logger
+from ..constants.constants import AudioConfig
+from ..utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
