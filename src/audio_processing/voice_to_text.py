@@ -149,21 +149,31 @@ class VoiceToText:
                 input_device_index=device_index,
                 frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE,
                 stream_callback=None,
-                start=False  # 先不启动流
+                start=True  # 直接启动流
             )
             
+            # 等待流启动
+            time.sleep(0.1)
+            
             # 测试流是否可用
-            stream.start_stream()
-            test_data = stream.read(1024, exception_on_overflow=False)
-            if not test_data:
-                raise Exception("无法从音频流读取数据")
-                
-            stream.stop_stream()
-            return stream
+            try:
+                test_data = stream.read(1024, exception_on_overflow=False)
+                if not test_data:
+                    raise Exception("无法从音频流读取数据")
+                return stream
+            except Exception as e:
+                logger.error(f"测试音频流失败: {e}")
+                if stream:
+                    try:
+                        stream.stop_stream()
+                        stream.close()
+                    except:
+                        pass
+                return None
             
         except Exception as e:
             logger.error(f"创建音频流失败: {e}")
-            if stream:
+            if 'stream' in locals() and stream:
                 try:
                     stream.close()
                 except:
@@ -214,6 +224,16 @@ class VoiceToText:
             
             while self.running:
                 try:
+                    # 检查流是否还在运行
+                    if not self.stream.is_active():
+                        logger.error("音频流已停止，尝试重新启动")
+                        try:
+                            self.stream.start_stream()
+                            time.sleep(0.1)  # 等待流启动
+                        except Exception as e:
+                            logger.error(f"重新启动音频流失败: {e}")
+                            break
+                    
                     # 读取音频数据
                     data = self.stream.read(AudioConfig.INPUT_FRAME_SIZE, exception_on_overflow=False)
                     
@@ -229,6 +249,19 @@ class VoiceToText:
                                 
                 except Exception as e:
                     logger.error(f"处理音频数据时出错: {e}")
+                    # 如果是流关闭错误，尝试重新创建流
+                    if "Stream closed" in str(e) or "Stream is stopped" in str(e):
+                        logger.info("尝试重新创建音频流")
+                        try:
+                            if self.stream:
+                                self.stream.stop_stream()
+                                self.stream.close()
+                        except:
+                            pass
+                        self.stream = self._create_audio_stream(device_index, rate)
+                        if not self.stream:
+                            logger.error("重新创建音频流失败")
+                            break
                     time.sleep(0.1)
                     
         except Exception as e:
