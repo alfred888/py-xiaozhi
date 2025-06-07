@@ -108,6 +108,22 @@ class VoiceToText:
             
         logger.info("语音转文字已停止")
         
+    def _create_audio_stream(self, device_index, sample_rate):
+        """创建音频流"""
+        try:
+            stream = self.audio.open(
+                format=pyaudio.paInt16,
+                channels=AudioConfig.CHANNELS,
+                rate=sample_rate,
+                input=True,
+                input_device_index=device_index,
+                frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE
+            )
+            return stream
+        except Exception as e:
+            logger.error(f"创建音频流失败: {e}")
+            return None
+        
     def _recognition_loop(self):
         """语音识别主循环"""
         try:
@@ -121,25 +137,33 @@ class VoiceToText:
             if supported_rates:
                 logger.info(f"设备支持的采样率: {supported_rates}")
             
-            # 检查设备是否支持目标采样率
-            target_rate = AudioConfig.INPUT_SAMPLE_RATE
-            if supported_rates and target_rate not in supported_rates:
-                logger.warning(f"设备不支持{target_rate}Hz采样率，使用设备默认采样率{default_rate}Hz")
-                sample_rate = default_rate
-            else:
-                sample_rate = target_rate
-                logger.info(f"使用目标采样率: {sample_rate}Hz")
+            # 尝试不同的采样率
+            sample_rates_to_try = [
+                AudioConfig.INPUT_SAMPLE_RATE,  # 首选采样率
+                default_rate,                   # 设备默认采样率
+                16000,                          # 常用采样率
+                44100,                          # 标准采样率
+                48000                           # 高采样率
+            ]
             
-            # 创建音频流
-            self.stream = self.audio.open(
-                format=pyaudio.paInt16,
-                channels=AudioConfig.CHANNELS,
-                rate=sample_rate,
-                input=True,
-                input_device_index=device_index,
-                frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE
-            )
+            # 如果设备支持特定采样率，优先使用
+            if supported_rates:
+                sample_rates_to_try = [rate for rate in supported_rates if rate in sample_rates_to_try]
             
+            # 尝试不同的采样率
+            stream = None
+            for rate in sample_rates_to_try:
+                logger.info(f"尝试使用采样率: {rate}Hz")
+                stream = self._create_audio_stream(device_index, rate)
+                if stream:
+                    logger.info(f"成功使用采样率: {rate}Hz")
+                    break
+                time.sleep(0.1)  # 短暂延迟后重试
+            
+            if not stream:
+                raise Exception("无法创建有效的音频流")
+            
+            self.stream = stream
             logger.info("开始语音识别循环")
             
             while self.running:
