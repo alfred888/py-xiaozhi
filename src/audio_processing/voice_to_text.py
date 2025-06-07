@@ -1,4 +1,5 @@
 import json
+import os
 import threading
 import time
 from typing import Callable, Optional
@@ -16,6 +17,9 @@ class VoiceToText:
 
     def __init__(self):
         """初始化语音转文字功能"""
+        # 设置环境变量，强制使用PulseAudio
+        os.environ['PULSE_LATENCY_MSEC'] = '30'
+        
         # 初始化基本属性
         self.audio = pyaudio.PyAudio()
         self.stream = None
@@ -54,24 +58,45 @@ class VoiceToText:
         
         # 遍历所有设备
         for i in range(self.audio.get_device_count()):
-            info = self.audio.get_device_info_by_index(i)
-            logger.debug(f"设备 {i}: {info['name']} (输入通道: {info['maxInputChannels']}, 输出通道: {info['maxOutputChannels']})")
-            
-            # 检查是否是输入设备
-            if info["maxInputChannels"] > 0:
-                # 优先选择讯飞麦克风设备
-                if "XFM-DP" in info["name"] or "ACM" in info["name"]:
-                    device_index = i
-                    device_info = info
-                    logger.info(f"找到讯飞麦克风设备: {info['name']} (索引: {i})")
-                    break
+            try:
+                info = self.audio.get_device_info_by_index(i)
+                logger.debug(f"设备 {i}: {info['name']} (输入通道: {info['maxInputChannels']}, 输出通道: {info['maxOutputChannels']})")
+                
+                # 检查是否是输入设备
+                if info["maxInputChannels"] > 0:
+                    # 优先选择讯飞麦克风设备
+                    if "XFM-DP" in info["name"] or "ACM" in info["name"]:
+                        device_index = i
+                        device_info = info
+                        logger.info(f"找到讯飞麦克风设备: {info['name']} (索引: {i})")
+                        break
+            except Exception as e:
+                logger.warning(f"获取设备 {i} 信息时出错: {e}")
+                continue
         
         # 如果找不到讯飞麦克风设备，使用默认输入设备
         if device_index is None:
-            logger.warning("未找到讯飞麦克风设备，使用默认输入设备")
-            device_index = self.audio.get_default_input_device_info()["index"]
-            device_info = self.audio.get_device_info_by_index(device_index)
-            logger.info(f"使用默认输入设备: {device_info['name']} (索引: {device_index})")
+            try:
+                logger.warning("未找到讯飞麦克风设备，使用默认输入设备")
+                device_index = self.audio.get_default_input_device_info()["index"]
+                device_info = self.audio.get_device_info_by_index(device_index)
+                logger.info(f"使用默认输入设备: {device_info['name']} (索引: {device_index})")
+            except Exception as e:
+                logger.error(f"获取默认输入设备失败: {e}")
+                # 尝试使用第一个可用的输入设备
+                for i in range(self.audio.get_device_count()):
+                    try:
+                        info = self.audio.get_device_info_by_index(i)
+                        if info["maxInputChannels"] > 0:
+                            device_index = i
+                            device_info = info
+                            logger.info(f"使用备用输入设备: {info['name']} (索引: {i})")
+                            break
+                    except Exception as e:
+                        continue
+                
+                if device_index is None:
+                    raise Exception("找不到可用的输入设备")
             
         return device_index, device_info
             
@@ -102,26 +127,47 @@ class VoiceToText:
             
         # 关闭音频流
         if self.stream:
-            self.stream.stop_stream()
-            self.stream.close()
-            self.stream = None
+            try:
+                self.stream.stop_stream()
+                self.stream.close()
+            except Exception as e:
+                logger.error(f"关闭音频流时出错: {e}")
+            finally:
+                self.stream = None
             
         logger.info("语音转文字已停止")
         
     def _create_audio_stream(self, device_index, sample_rate):
         """创建音频流"""
         try:
+            # 尝试使用PulseAudio
             stream = self.audio.open(
                 format=pyaudio.paInt16,
                 channels=AudioConfig.CHANNELS,
                 rate=sample_rate,
                 input=True,
                 input_device_index=device_index,
-                frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE
+                frames_per_buffer=AudioConfig.INPUT_FRAME_SIZE,
+                stream_callback=None,
+                start=False  # 先不启动流
             )
+            
+            # 测试流是否可用
+            stream.start_stream()
+            test_data = stream.read(1024, exception_on_overflow=False)
+            if not test_data:
+                raise Exception("无法从音频流读取数据")
+                
+            stream.stop_stream()
             return stream
+            
         except Exception as e:
             logger.error(f"创建音频流失败: {e}")
+            if stream:
+                try:
+                    stream.close()
+                except:
+                    pass
             return None
         
     def _recognition_loop(self):
@@ -139,11 +185,11 @@ class VoiceToText:
             
             # 尝试不同的采样率
             sample_rates_to_try = [
-                AudioConfig.INPUT_SAMPLE_RATE,  # 首选采样率
                 default_rate,                   # 设备默认采样率
                 16000,                          # 常用采样率
                 44100,                          # 标准采样率
-                48000                           # 高采样率
+                48000,                          # 高采样率
+                AudioConfig.INPUT_SAMPLE_RATE   # 配置的采样率
             ]
             
             # 如果设备支持特定采样率，优先使用
@@ -190,9 +236,13 @@ class VoiceToText:
         finally:
             # 确保资源被正确释放
             if self.stream:
-                self.stream.stop_stream()
-                self.stream.close()
-                self.stream = None
+                try:
+                    self.stream.stop_stream()
+                    self.stream.close()
+                except Exception as e:
+                    logger.error(f"关闭音频流时出错: {e}")
+                finally:
+                    self.stream = None
                 
     def is_running(self) -> bool:
         """检查是否正在运行"""
