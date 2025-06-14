@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>800</width>
-    <height>300</height>
+    <height>400</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -136,13 +136,19 @@ QTabBar {
           </item>
           <item>
            <widget class="QLabel" name="tts_text_label">
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>60</height>
+             </size>
+            </property>
             <property name="font">
              <font>
-              <pointsize>12</pointsize>
+              <pointsize>14</pointsize>
              </font>
             </property>
             <property name="styleSheet">
-             <string notr="true"/>
+             <string notr="true">padding: 10px;</string>
             </property>
             <property name="text">
              <string>待命</string>
@@ -263,8 +269,13 @@ QTabBar {
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>36</height>
+             <height>48</height>
             </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>12</pointsize>
+            </font>
            </property>
            <property name="text">
             <string>按住后说话</string>
@@ -276,8 +287,13 @@ QTabBar {
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>36</height>
+             <height>48</height>
             </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>12</pointsize>
+            </font>
            </property>
            <property name="text">
             <string>打断对话</string>
@@ -294,8 +310,16 @@ QTabBar {
              <property name="minimumSize">
               <size>
                <width>0</width>
-               <height>36</height>
+               <height>48</height>
               </size>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>12</pointsize>
+              </font>
+             </property>
+             <property name="styleSheet">
+              <string>padding: 8px;</string>
              </property>
              <property name="placeholderText">
               <string>输入文字...</string>
@@ -307,8 +331,13 @@ QTabBar {
              <property name="minimumSize">
               <size>
                <width>60</width>
-               <height>36</height>
+               <height>48</height>
               </size>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>12</pointsize>
+              </font>
              </property>
              <property name="text">
               <string>发送</string>
@@ -322,8 +351,13 @@ QTabBar {
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>36</height>
+             <height>48</height>
             </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>12</pointsize>
+            </font>
            </property>
            <property name="text">
             <string>开始对话</string>
@@ -335,8 +369,13 @@ QTabBar {
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>36</height>
+             <height>48</height>
             </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>12</pointsize>
+            </font>
            </property>
            <property name="text">
             <string>手动对话</string>
@@ -510,7 +549,22 @@ QTabBar {
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="wakeWordsLineEdit"/>
+             <widget class="QLineEdit" name="wakeWordsLineEdit">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>36</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>11</pointsize>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string>padding: 6px;</string>
+              </property>
+             </widget>
             </item>
            </layout>
           </item>
@@ -550,7 +604,22 @@ QTabBar {
              </widget>
             </item>
             <item row="0" column="1">
-             <widget class="QLineEdit" name="deviceIdLineEdit"/>
+             <widget class="QLineEdit" name="deviceIdLineEdit">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>36</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>11</pointsize>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string>padding: 6px;</string>
+              </property>
+             </widget>
             </item>
             <item row="1" column="0">
              <widget class="QLabel" name="otaUrlLabel">
@@ -596,6 +665,20 @@ QTabBar {
                </item>
                <item>
                 <widget class="QLineEdit" name="otaAddressLineEdit">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>36</height>
+                  </size>
+                 </property>
+                 <property name="font">
+                  <font>
+                   <pointsize>11</pointsize>
+                  </font>
+                 </property>
+                 <property name="styleSheet">
+                  <string>padding: 6px;</string>
+                 </property>
                  <property name="sizePolicy">
                   <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                    <horstretch>1</horstretch>
@@ -651,6 +734,20 @@ QTabBar {
                </item>
                <item>
                 <widget class="QLineEdit" name="wsAddressLineEdit">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>36</height>
+                  </size>
+                 </property>
+                 <property name="font">
+                  <font>
+                   <pointsize>11</pointsize>
+                  </font>
+                 </property>
+                 <property name="styleSheet">
+                  <string>padding: 6px;</string>
+                 </property>
                  <property name="sizePolicy">
                   <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                    <horstretch>1</horstretch>
@@ -670,7 +767,22 @@ QTabBar {
              </widget>
             </item>
             <item row="3" column="1">
-             <widget class="QLineEdit" name="wsTokenLineEdit"/>
+             <widget class="QLineEdit" name="wsTokenLineEdit">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>36</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>11</pointsize>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string>padding: 6px;</string>
+              </property>
+             </widget>
             </item>
            </layout>
           </item>
@@ -756,6 +868,20 @@ QTabBar {
                </item>
                <item>
                 <widget class="QLineEdit" name="ha_server">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>36</height>
+                  </size>
+                 </property>
+                 <property name="font">
+                  <font>
+                   <pointsize>11</pointsize>
+                  </font>
+                 </property>
+                 <property name="styleSheet">
+                  <string>padding: 6px;</string>
+                 </property>
                  <property name="sizePolicy">
                   <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                    <horstretch>1</horstretch>
@@ -782,6 +908,20 @@ QTabBar {
             </item>
             <item row="1" column="1">
              <widget class="QLineEdit" name="ha_port">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>36</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>11</pointsize>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string>padding: 6px;</string>
+              </property>
               <property name="placeholderText">
                <string>默认端口：8123</string>
               </property>
@@ -799,6 +939,20 @@ QTabBar {
             </item>
             <item row="2" column="1">
              <widget class="QLineEdit" name="ha_key">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>36</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>11</pointsize>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string>padding: 6px;</string>
+              </property>
               <property name="echoMode">
                <enum>QLineEdit::Password</enum>
               </property>

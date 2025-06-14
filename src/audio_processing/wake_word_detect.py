@@ -775,9 +775,9 @@ class WakeWordDetector:
                 logger.error("未找到可用的麦克风设备")
                 return False
 
-            logger.info(f"找到 {len(input_devices)} 个麦克风设备:")
+            logger.debug(f"找到 {len(input_devices)} 个麦克风设备:")
             for device in input_devices:
-                logger.info(f"- 设备 {device['index']}: {device['name']} (通道数: {device['channels']})")
+                logger.debug(f"- 设备 {device['index']}: {device['name']} (通道数: {device['channels']}, 采样率: {device['defaultSampleRate']}Hz)")
 
             # 检查当前使用的输入流
             if not hasattr(self.audio_codec, "input_stream"):
